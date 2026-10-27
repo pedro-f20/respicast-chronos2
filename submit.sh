@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One weekly round: forecast the next Wednesday origin and open the submission PR from the fork.
 # Safe to run several times a week: it does nothing once the round is submitted or while the
-# round's data isn't out. Needs GH_TOKEN (pedro-f20, public_repo + workflow scopes) and a venv at .venv.
+# round's data isn't out. Needs GH_TOKEN (pedro-f20 classic token, public_repo scope only) and a venv at .venv.
 #   ORIGIN=YYYY-MM-DD  override the round
 #   DRY_RUN=1          forecast only, no push or PR
 #   FINAL=1            last run before the deadline: missing data is an error, not a wait
@@ -44,17 +44,18 @@ fi
 [[ $status -eq 0 ]] || exit $status
 [[ -z "${DRY_RUN:-}" ]] || { echo "[submit] dry run, stopping before push"; exit 0; }
 
-# the fork must hold the upstream commit the branch is built on
-gh repo sync "$FORK" --source "$UPSTREAM" --branch main
-
-mkdir -p "hub/model-output/$MODEL"
-cp "out/$ORIGIN-$MODEL.csv" "hub/$FILE"
-git -C hub sparse-checkout add "model-output/$MODEL"
-git -C hub switch -q -c "$BRANCH"
-git -C hub add "$FILE"
-git -C hub -c user.name=pedro-f20 -c user.email=250035667+pedro-f20@users.noreply.github.com \
+# Branch from the fork's own main, never synced: syncing needs the workflow scope, which GitHub only
+# grants with full private-repo access. The PR adds one new file, so a stale base merges cleanly.
+rm -rf fork
+git clone -q --depth 1 --filter=blob:none --sparse "https://github.com/$FORK.git" fork
+git -C fork sparse-checkout set "model-output/$MODEL"
+mkdir -p "fork/model-output/$MODEL"
+cp "out/$ORIGIN-$MODEL.csv" "fork/$FILE"
+git -C fork switch -q -c "$BRANCH"
+git -C fork add "$FILE"
+git -C fork -c user.name=pedro-f20 -c user.email=250035667+pedro-f20@users.noreply.github.com \
   commit -q -m "Add $MODEL forecast for $ORIGIN"
-git -C hub push -q "https://x-access-token:$GH_TOKEN@github.com/$FORK.git" "$BRANCH"
+git -C fork push -q "https://x-access-token:$GH_TOKEN@github.com/$FORK.git" "$BRANCH"
 
 cells=$(awk -F, '$6 == "median"' "out/$ORIGIN-$MODEL.csv" | wc -l | tr -d ' ')
 pr=$(gh pr create --repo "$UPSTREAM" --head "pedro-f20:$BRANCH" --base main \
