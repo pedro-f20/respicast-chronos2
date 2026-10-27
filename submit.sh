@@ -19,6 +19,7 @@ BRANCH="$MODEL-$ORIGIN"
 echo "[submit] round $ORIGIN"
 
 if [[ -z "${DRY_RUN:-}" ]]; then
+  [[ -n "${GH_TOKEN:-}" ]] || { echo "[submit] GH_TOKEN is empty: set the RESPICAST_TOKEN secret" >&2; exit 1; }
   if gh api "repos/$UPSTREAM/contents/$FILE" --silent 2>/dev/null; then
     echo "[submit] $FILE is already in the hub, nothing to do"; exit 0
   fi
