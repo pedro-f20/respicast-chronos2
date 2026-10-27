@@ -24,6 +24,8 @@ Things that did not beat it by the 3% bar I set before scoring: revision nowcast
 
 `.github/workflows/submit.yml` runs Friday evening, Monday, Tuesday and twice on Wednesday (UTC). Each run forecasts the next Wednesday round, does nothing if it's already submitted or the data isn't out, and otherwise opens a PR from the `pedro-f20` fork. `submissions.csv` lists the rounds.
 
+`.github/workflows/check.yml` runs on Thursday: it fails if the round that closed on Wednesday has no file in the hub, and updates [SEASON.md](SEASON.md), an interim scoreboard against the hub ensemble from the hub's own scores.
+
 By hand:
 
 ```

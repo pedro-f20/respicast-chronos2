@@ -1,0 +1,40 @@
+name: Weekly check and scoreboard
+
+on:
+  schedule:
+    - cron: "0 6 * * 4"  # Thursday, after the Wednesday 22:59 UTC deadline
+  workflow_dispatch:
+    inputs:
+      round:
+        description: "Round to check (Wednesday, YYYY-MM-DD); default the one just gone"
+        required: false
+
+permissions:
+  contents: write  # commits SEASON.md
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Check round and update scoreboard
+        env:
+          GH_TOKEN: ${{ github.token }}  # read-only use of the public hub
+          ROUND: ${{ inputs.round }}
+        run: bash check.sh
+
+      - name: Commit scoreboard
+        if: always()
+        run: |
+          [ -f SEASON.md ] || exit 0
+          git add SEASON.md
+          git diff --cached --quiet && exit 0
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -q -m "Update season scoreboard"
+          git pull -q --rebase
+          git push -q
