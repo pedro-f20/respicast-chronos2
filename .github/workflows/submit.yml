@@ -2,12 +2,13 @@ name: Weekly RespiCast submission
 
 on:
   schedule:
-    # hub data usually lands on Friday; the deadline is Wednesday 23:59 CET (22:59 UTC)
-    - cron: "0 18 * * 5"
-    - cron: "0 6 * * 1"
-    - cron: "0 6 * * 2"
-    - cron: "0 6 * * 3"
-    - cron: "0 18 * * 3"
+    # Hub data lands Friday ~21:45-22:45 UTC; the deadline is Wednesday 23:59 CET/CEST (21:59-22:59 UTC).
+    # GitHub starts scheduled runs up to ~4 h late, so the last run is early on Wednesday.
+    - cron: "17 23 * * 5"
+    - cron: "17 9 * * 6"
+    - cron: "17 6 * * 1"
+    - cron: "17 6 * * 2"
+    - cron: "17 6 * * 3"
   workflow_dispatch:
     inputs:
       origin:
@@ -42,15 +43,15 @@ jobs:
       - name: Install
         run: |
           uv venv --python 3.12
-          uv pip install --torch-backend cpu -r requirements.txt
+          uv pip install --torch-backend cpu -r requirements.lock  # full pinned set: no drift mid-season
 
       - name: Forecast and submit
         env:
           GH_TOKEN: ${{ secrets.RESPICAST_TOKEN }}
           ORIGIN: ${{ inputs.origin }}
           DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
-          # the 18:00 UTC Wednesday run is the last before the deadline
-          FINAL: ${{ github.event.schedule == '0 18 * * 3' && '1' || '' }}
+          # the Wednesday run is the last before the deadline
+          FINAL: ${{ github.event.schedule == '17 6 * * 3' && '1' || '' }}
         run: bash submit.sh
 
       - uses: actions/upload-artifact@v4
@@ -61,6 +62,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Record submission
+        if: always()  # keep the record of an opened PR even if a later step failed
         run: |
           git diff --quiet submissions.csv && exit 0
           git config user.name github-actions[bot]

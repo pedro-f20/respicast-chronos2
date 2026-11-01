@@ -2,12 +2,13 @@
 
 Same model and settings as the backtest (data-advisory scripts respicast_chronos.chronos2), copied
 here so this repo runs on its own. Do not change it during the season: the live test is
-pre-registered with these settings.
+pre-registered with these settings. (1 Nov 2026: only the data gating and the tasks.json filter changed.)
 
 Usage: python forecast.py <hub_checkout> <origin YYYY-MM-DD> <out_dir>
 Exit 3 when the hub has no data for this round yet (newest snapshot older than the Friday before).
 """
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -38,6 +39,7 @@ def load_snapshots(hub: Path) -> pd.DataFrame:
         for path in sorted((hub / "target-data" / source / "snapshots").glob("*_incidence.csv")):
             snap = pd.read_csv(path, usecols=["target", "location", "truth_date", "value"])
             snap["published"] = pd.Timestamp(path.name[:10])
+            snap["source"] = f"{source} {path.name[11:].removesuffix('_incidence.csv')}"  # e.g. "FluID ILI"
             rows.append(snap)
     snaps = pd.concat(rows)
     snaps["date"] = pd.to_datetime(snaps.pop("truth_date"))
@@ -106,10 +108,24 @@ def to_hub_format(fc: pd.DataFrame, origin: pd.Timestamp) -> pd.DataFrame:
     return pd.concat([quantiles, medians])[COLUMNS].sort_values(COLUMNS[:7]).reset_index(drop=True)
 
 
+def drop_unlisted(fc: pd.DataFrame, hub: Path) -> pd.DataFrame:
+    """Submit what the hub's tasks.json lists rather than a file it rejects. Target weeks are listed only to a
+    fixed date (2026-12-27 as of Nov 2026; check.sh warns weeks ahead), and data can carry a location first."""
+    tasks = json.loads((hub / "hub-config" / "tasks.json").read_text())["rounds"][0]["model_tasks"][0]["task_ids"]
+    listed = fc.target_end_date.isin(tasks["target_end_date"]["optional"]) & fc.location.isin(tasks["location"]["optional"])
+    if not listed.all():
+        dropped = fc[~listed]
+        print(f"[forecast] leaving out cells not in the hub's tasks.json: weeks {sorted(set(dropped.target_end_date))},"
+              f" locations {sorted(set(dropped.location))}")
+    return fc[listed].reset_index(drop=True)
+
+
 def validate(fc: pd.DataFrame, hub: Path, origin: pd.Timestamp) -> None:
     """The format rules from the hub wiki and tasks.json that a bad run could break."""
     tasks = json.loads((hub / "hub-config" / "tasks.json").read_text())["rounds"][0]["model_tasks"][0]["task_ids"]
-    problems = []
+    problems = [] if len(fc) else ["no cells left to submit"]
+    if not set(fc.target_end_date) <= set(tasks["target_end_date"]["optional"]):
+        problems.append(f"target_end_date not in tasks.json {sorted(set(fc.target_end_date) - set(tasks['target_end_date']['optional']))}")
     if not set(fc.location) <= set(tasks["location"]["optional"]):
         problems.append(f"unknown locations {set(fc.location) - set(tasks['location']['optional'])}")
     if origin.strftime("%Y-%m-%d") not in tasks["origin_date"]["optional"]:
@@ -133,14 +149,21 @@ def main() -> None:
     if origin.day_of_week != 2:
         raise ValueError(f"[forecast] origin {origin.date()} is not a Wednesday")
     snaps = load_snapshots(hub)
-    newest = snaps[snaps.published < origin].published.max()
+    newest_by_source = snaps[snaps.published < origin].groupby("source").published.max()
+    newest = newest_by_source.max()
     if newest < origin - pd.Timedelta(days=DATA_LEAD_DAYS):
         print(f"[forecast] {origin.date()}: newest snapshot is {newest.date()}, this round's data isn't out yet")
+        sys.exit(EXIT_NO_DATA)
+    # ERVISS and FluID land ~45 min apart on Friday: wait for every file, except on the last run before the deadline
+    late = newest_by_source[newest_by_source < origin - pd.Timedelta(days=DATA_LEAD_DAYS)]
+    if len(late) and not os.environ.get("FINAL"):
+        print(f"[forecast] {origin.date()}: {', '.join(late.index)} not updated yet, waiting")
         sys.exit(EXIT_NO_DATA)
     history = fresh_history(history_as_of(snaps, origin), origin)
     if history.empty:
         raise RuntimeError(f"[forecast] {origin.date()}: no series fresh enough to forecast")
     fc = to_hub_format(predict(context_frame(history), origin), origin)
+    fc = drop_unlisted(fc, hub)
     validate(fc, hub, origin)
     out_dir.mkdir(parents=True, exist_ok=True)
     path = out_dir / f"{origin.strftime('%Y-%m-%d')}-{HUB_MODEL}.csv"
