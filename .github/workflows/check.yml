@@ -31,7 +31,7 @@ jobs:
         if: always()
         run: |
           [ -f SEASON.md ] || exit 0
-          git add SEASON.md
+          git add SEASON.md scores.json
           git diff --cached --quiet && exit 0
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com

@@ -3,8 +3,11 @@ other Chronos entries, on cells both forecast. Interim only: the final 2026-27 r
 pre-registered rules (truth as of 2027-06-30, block-bootstrap interval).
 
 Usage: python scoreboard.py <hub_checkout> <out.md> [model] [season_start]
+Also writes scores.json beside out.md: the live result card the AI4G tracker shows.
 """
+import json
 import sys
+from datetime import date
 from pathlib import Path
 
 import numpy as np
@@ -35,7 +38,10 @@ def ratio(pair: pd.DataFrame, model: str, other: str) -> float:
 
 
 def shared(sc: pd.DataFrame, model: str, other: str) -> pd.DataFrame:
-    return sc[sc.model.isin([model, other])].pivot_table(index=KEY, columns="model", values="value_absolute").dropna()
+    pair = sc[sc.model.isin([model, other])].pivot_table(index=KEY, columns="model", values="value_absolute")
+    if not {model, other} <= set(pair.columns):  # one side not scored yet: nothing shared
+        return pair.iloc[0:0]
+    return pair.dropna()
 
 
 def build(sc: pd.DataFrame, model: str) -> str:
@@ -58,12 +64,36 @@ def build(sc: pd.DataFrame, model: str) -> str:
     return "\n".join(lines) + "\n"
 
 
+LABELS = {"respicast-hubEnsemble": "Us vs hub ensemble"}
+
+
+def build_scores(sc: pd.DataFrame, model: str, today: str) -> dict:
+    """Headline, period and one row per comparator, in the shape AI4G's status.py checks."""
+    rows, headline, rounds = [], "Live scores pending: no round scored yet", 0
+    for other in [c for c in COMPARATORS if c != model]:
+        pair = shared(sc, model, other)
+        label = LABELS.get(other, f"Us vs {other}")[:40]
+        if pair.empty:
+            rows.append({"measure": label, "value": "-"})
+            continue
+        r = ratio(pair, model, other)
+        rows.append({"measure": label, "value": f"{r:.2f}", "range": f"{len(pair)} cells"})
+        if other == COMPARATORS[0]:
+            rounds = pair.index.get_level_values("origin_date").nunique()
+            headline = f"{round(abs(1 - r) * 100)}% {'less' if r < 1 else 'more'} error than the hub ensemble"
+    period = f"2026-27 season, {rounds} round{'s' if rounds != 1 else ''} scored, interim; updated {today}"
+    return {"headline": headline, "period": period, "rows": rows}
+
+
 def main() -> None:
     hub, out = Path(sys.argv[1]), Path(sys.argv[2])
     model = sys.argv[3] if len(sys.argv) > 3 else MODEL
     season_start = sys.argv[4] if len(sys.argv) > 4 else SEASON_START
-    out.write_text(build(load_scores(hub, season_start), model))
-    print(f"[scoreboard] wrote {out}")
+    sc = load_scores(hub, season_start)
+    out.write_text(build(sc, model))
+    scores = out.with_name("scores.json")
+    scores.write_text(json.dumps(build_scores(sc, model, date.today().isoformat()), indent=2) + "\n")
+    print(f"[scoreboard] wrote {out} and {scores}")
 
 
 if __name__ == "__main__":
