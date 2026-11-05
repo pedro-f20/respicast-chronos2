@@ -1,0 +1,20 @@
+{
+  "headline": "1% more error than the hub ensemble",
+  "period": "2026-27 season, 1 round scored, interim; updated 2026-11-05",
+  "rows": [
+    {
+      "measure": "Us vs hub ensemble",
+      "value": "1.01",
+      "range": "34 cells"
+    },
+    {
+      "measure": "Us vs Chronos-Chronos2",
+      "value": "-"
+    },
+    {
+      "measure": "Us vs DHauser-FluChronos",
+      "value": "1.06",
+      "range": "34 cells"
+    }
+  ]
+}
