@@ -1,0 +1,100 @@
+name: Weekly BDBV Ebola submission
+
+# Runs the pedro-f20/bdbv-zonemix code with this repo's RESPICAST_TOKEN
+# (classic token, public_repo scope), so no second secret is needed.
+
+on:
+  schedule:
+    # Rounds run Sunday-Tuesday in Kinshasa (UTC+1). The hub opens each round around Monday midday
+    # UTC and commits the week's release Monday afternoon/evening UTC, but both have slipped to
+    # Tuesday evening. The window closes Tuesday 22:59 UTC and the hub checks it when validation
+    # runs. GitHub starts scheduled runs up to ~4-6 h late, so the Tuesday FINAL runs are spread:
+    # the first guarantees a file, the later ones replace it if the release lands.
+    - cron: "37 17 * * 0"
+    - cron: "37 17,21 * * 1"
+    - cron: "37 1,5 * * 2"
+    - cron: "37 9,15,19 * * 2"
+    # After the deadline: is the round in the hub, or in an open PR with passing checks?
+    - cron: "37 7 * * 3"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Round (Saturday, YYYY-MM-DD); default the coming Saturday"
+        required: false
+      dry_run:
+        description: "Forecast only, no PR"
+        type: boolean
+        default: false
+      check:
+        description: "Run the after-deadline check only"
+        type: boolean
+        default: false
+
+concurrency:
+  group: bdbv
+  cancel-in-progress: false
+
+jobs:
+  submit:
+    if: github.event.schedule != '37 7 * * 3' && !inputs.check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: pedro-f20/bdbv-zonemix
+          path: bdbv-zonemix
+          # this repo's GITHUB_TOKEN would override RESPICAST_TOKEN when pushing to bdbv-zonemix
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Install
+        working-directory: bdbv-zonemix
+        run: |
+          uv venv --python 3.12
+          uv pip install -r requirements.lock  # full pinned set: no drift mid-season
+
+      - name: Forecast and submit
+        working-directory: bdbv-zonemix
+        env:
+          GH_TOKEN: ${{ secrets.RESPICAST_TOKEN }}
+          REF: ${{ inputs.ref }}
+          DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
+          FINAL: ${{ github.event.schedule == '37 9,15,19 * * 2' && '1' || '' }}
+        run: bash submit.sh
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bdbv-forecast
+          path: bdbv-zonemix/out/
+          if-no-files-found: ignore
+
+      - name: Record submission in bdbv-zonemix
+        if: always()
+        working-directory: bdbv-zonemix
+        env:
+          GH_TOKEN: ${{ secrets.RESPICAST_TOKEN }}
+        run: |
+          git diff --quiet submissions.csv && exit 0
+          git config user.name pedro-f20
+          git config user.email 250035667+pedro-f20@users.noreply.github.com
+          git commit -q -am "Record submission"
+          git pull -q --rebase "https://x-access-token:$GH_TOKEN@github.com/pedro-f20/bdbv-zonemix.git" main
+          git push -q "https://x-access-token:$GH_TOKEN@github.com/pedro-f20/bdbv-zonemix.git" HEAD:main
+
+  check:
+    if: github.event.schedule == '37 7 * * 3' || inputs.check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: pedro-f20/bdbv-zonemix
+          persist-credentials: false
+      - name: Round submitted?
+        env:
+          GH_TOKEN: ${{ secrets.RESPICAST_TOKEN }}
+          REF: ${{ inputs.ref }}
+        run: bash check.sh
