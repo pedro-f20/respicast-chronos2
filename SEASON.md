@@ -4,12 +4,13 @@ Interim, from the hub's WIS scores (`model-evaluation/latest-forecast_scores.csv
 
 | comparator | ratio | shared cells | rounds |
 |---|---|---|---|
-| respicast-hubEnsemble | 1.01 | 34 | 1 |
+| respicast-hubEnsemble | 1.04 | 105 | 2 |
 | Chronos-Chronos2 | - | 0 | 0 |
-| DHauser-FluChronos | 1.06 | 34 | 1 |
+| DHauser-FluChronos | 1.05 | 105 | 2 |
 
 By round, vs respicast-hubEnsemble:
 
 | round | ratio | cells |
 |---|---|---|
-| 2026-10-28 | 1.01 | 34 |
+| 2026-10-28 | 1.05 | 71 |
+| 2026-11-04 | 0.96 | 34 |
