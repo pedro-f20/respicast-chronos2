@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # One weekly round: forecast the next Wednesday origin and open the submission PR from the fork.
 # Safe to run several times a week: it does nothing once the round is submitted or while the
-# round's data isn't out. Needs GH_TOKEN (pedro-f20 classic token, public_repo scope) and a venv at .venv.
+# round's data isn't out. Needs GH_TOKEN (pedro-f20 classic token, public_repo scope), optionally
+# SYNC_TOKEN (see sync_fork), and a venv at .venv.
 #   ORIGIN=YYYY-MM-DD  override the round
 #   DRY_RUN=1          forecast only, no push or PR
 #   FINAL=1            last run before the deadline: missing data is an error, not a wait
@@ -11,6 +12,10 @@ UPSTREAM=european-modelling-hubs/RespiCast-SyndromicIndicators
 FORK=pedro-f20/RespiCast-SyndromicIndicators
 MODEL=pedro-Chronos2
 EXIT_NO_DATA=3
+# Syncing the fork needs workflow rights once upstream edits its workflow files. A classic token only
+# gets those with full `repo` scope, so a fine-grained token limited to the fork does the sync.
+SYNC_TOKEN=${SYNC_TOKEN:-${GH_TOKEN:-}}
+sync_fork() { GH_TOKEN="$SYNC_TOKEN" gh api -X POST "repos/$FORK/merge-upstream" -f branch=main --silent; }
 
 # next Wednesday, or today if it is one (date +%u: Monday=1 ... Wednesday=3)
 ORIGIN=${ORIGIN:-$(date -u -d "+$(( (3 - $(date -u +%u) + 7) % 7 )) days" +%F)}
@@ -30,7 +35,7 @@ if [[ -z "${DRY_RUN:-}" ]]; then
       echo "[submit] PR $open_pr open (checks: ${checks:-none yet}), the hub merges it once they pass"; exit 0
     fi
     # Usually a stale branch: bring it up to the hub's main, which re-runs the validator
-    gh api -X POST "repos/$FORK/merge-upstream" -f branch=main --silent || true
+    sync_fork || true
     gh api -X PUT "repos/$UPSTREAM/pulls/${open_pr##*/}/update-branch" --silent || true
     echo "[submit] PR $open_pr failed the hub's validation; updated it from the hub's main, check it re-passes" >&2; exit 1
   fi
@@ -52,10 +57,9 @@ fi
 [[ -z "${DRY_RUN:-}" ]] || { echo "[submit] dry run, stopping before push"; exit 0; }
 
 # The hub's validator reads supporting-files/forecasting_weeks.csv from the PR branch, so the fork's
-# main must hold this week's rounds. Syncing works with public_repo scope until upstream edits its
-# workflow files; then it fails and the fork has to be synced by hand.
-gh api -X POST "repos/$FORK/merge-upstream" -f branch=main --silent ||
-  { echo "[submit] could not sync $FORK with $UPSTREAM: sync it on GitHub, then rerun" >&2; exit 1; }
+# main must hold this week's rounds.
+sync_fork ||
+  { echo "[submit] could not sync $FORK with $UPSTREAM: check the RESPICAST_SYNC_TOKEN secret, or sync it on GitHub and rerun" >&2; exit 1; }
 rm -rf fork
 git clone -q --depth 1 --filter=blob:none --sparse "https://github.com/$FORK.git" fork
 git -C fork sparse-checkout set "model-output/$MODEL"

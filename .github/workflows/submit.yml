@@ -48,6 +48,7 @@ jobs:
       - name: Forecast and submit
         env:
           GH_TOKEN: ${{ secrets.RESPICAST_TOKEN }}
+          SYNC_TOKEN: ${{ secrets.RESPICAST_SYNC_TOKEN }}  # fine-grained, fork only: Contents + Workflows write
           ORIGIN: ${{ inputs.origin }}
           DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
           # the Wednesday run is the last before the deadline
