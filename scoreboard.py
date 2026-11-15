@@ -15,7 +15,9 @@ import pandas as pd
 
 MODEL = "pedro-Chronos2"
 SEASON_START = "2026-10-28"
-COMPARATORS = ["respicast-hubEnsemble", "Chronos-Chronos2", "DHauser-FluChronos"]
+ENSEMBLE, BASELINE = "respicast-hubEnsemble", "respicast-quantileBaseline"
+HUB_PREFIX = "respicast-"  # the hub's own models; everything else is an outside team
+MAX_CARD_ROWS = 6  # AI4G's parse_scores limit
 HORIZONS = [1, 2, 3, 4]
 IN_SEASON_MONTHS = [10, 11, 12, 1, 2, 3, 4, 5]
 KEY = ["origin_date", "target", "target_end_date", "horizon", "location"]
@@ -44,43 +46,61 @@ def shared(sc: pd.DataFrame, model: str, other: str) -> pd.DataFrame:
     return pair.dropna()
 
 
+def teams(sc: pd.DataFrame, model: str) -> list[str]:
+    return sorted(m for m in sc.model.unique() if m != model and not m.startswith(HUB_PREFIX))
+
+
+def rank_teams(sc: pd.DataFrame, model: str) -> list[dict]:
+    """Ratio vs each outside team on shared cells, keeping teams that share at least half our widest overlap
+    with any team, so a team scored on a handful of cells doesn't count as a rival; strongest teams first."""
+    pairs = [(t, shared(sc, model, t)) for t in teams(sc, model)]
+    pairs = [(t, p) for t, p in pairs if len(p)]
+    widest = max((len(p) for _, p in pairs), default=0)
+    return sorted(({"team": t, "ratio": ratio(p, model, t), "cells": len(p)} for t, p in pairs if 2 * len(p) >= widest),
+                  key=lambda r: (-r["ratio"], r["team"]))
+
+
 def build(sc: pd.DataFrame, model: str) -> str:
     lines = ["# 2026-27 season scoreboard", "",
              f"Interim, from the hub's WIS scores (`model-evaluation/latest-forecast_scores.csv`), horizons 1-4, "
              f"target weeks Oct-May. Ratio = {model} WIS / comparator WIS, geometric mean over countries and targets; "
-             "below 1 means {model} is better.".replace("{model}", model), "",
-             "| comparator | ratio | shared cells | rounds |", "|---|---|---|---|"]
-    for other in [c for c in COMPARATORS if c != model]:
+             f"below 1 means {model} is better. Teams ranked if they share at least half the widest overlap.", "",
+             "| comparator | ratio | shared cells | rounds | ranked |", "|---|---|---|---|---|"]
+    ranked = {r["team"] for r in rank_teams(sc, model)}
+    for other in [ENSEMBLE, BASELINE, *teams(sc, model)]:
         pair = shared(sc, model, other)
         if pair.empty:
-            lines.append(f"| {other} | - | 0 | 0 |")
+            lines.append(f"| {other} | - | 0 | 0 | |")
             continue
         rounds = pair.index.get_level_values("origin_date").nunique()
-        lines.append(f"| {other} | {ratio(pair, model, other):.2f} | {len(pair)} | {rounds} |")
-    pair = shared(sc, model, COMPARATORS[0])
-    lines += ["", f"By round, vs {COMPARATORS[0]}:", "", "| round | ratio | cells |", "|---|---|---|"]
+        mark = "yes" if other in ranked else ("" if other.startswith(HUB_PREFIX) else "no")
+        lines.append(f"| {other} | {ratio(pair, model, other):.2f} | {len(pair)} | {rounds} | {mark} |")
+    pair = shared(sc, model, ENSEMBLE)
+    lines += ["", f"By round, vs {ENSEMBLE}:", "", "| round | ratio | cells |", "|---|---|---|"]
     for origin, g in pair.groupby(level="origin_date"):
-        lines.append(f"| {origin.date()} | {ratio(g, model, COMPARATORS[0]):.2f} | {len(g)} |")
+        lines.append(f"| {origin.date()} | {ratio(g, model, ENSEMBLE):.2f} | {len(g)} |")
     return "\n".join(lines) + "\n"
 
 
-LABELS = {"respicast-hubEnsemble": "Us vs hub ensemble"}
-
-
 def build_scores(sc: pd.DataFrame, model: str, today: str) -> dict:
-    """Headline, period and one row per comparator, in the shape AI4G's status.py checks."""
-    rows, headline, rounds = [], "Live scores pending: no round scored yet", 0
-    for other in [c for c in COMPARATORS if c != model]:
+    """Headline (rank among outside teams, then the ensemble), period and rows, in the shape AI4G's status.py checks."""
+    vs_ensemble = shared(sc, model, ENSEMBLE)
+    if vs_ensemble.empty:
+        return {"headline": "Live scores pending: no round scored yet",
+                "period": f"2026-27 season, 0 rounds scored; updated {today}", "rows": []}
+    rows = []
+    for label, other in [("Us vs hub ensemble", ENSEMBLE), ("Us vs baseline", BASELINE)]:
         pair = shared(sc, model, other)
-        label = LABELS.get(other, f"Us vs {other}")[:40]
-        if pair.empty:
-            rows.append({"measure": label, "value": "-"})
-            continue
-        r = ratio(pair, model, other)
-        rows.append({"measure": label, "value": f"{r:.2f}", "range": f"{len(pair)} cells"})
-        if other == COMPARATORS[0]:
-            rounds = pair.index.get_level_values("origin_date").nunique()
-            headline = f"{round(abs(1 - r) * 100)}% {'less' if r < 1 else 'more'} error than the hub ensemble"
+        rows.append({"measure": label, "value": f"{ratio(pair, model, other):.2f}" if len(pair) else "-",
+                     "range": f"{len(pair)} cells"})
+    ranked = rank_teams(sc, model)
+    rows += [{"measure": f"Us vs {r['team']}"[:40], "value": f"{r['ratio']:.2f}", "range": f"{r['cells']} cells"}
+             for r in ranked][:MAX_CARD_ROWS - len(rows)]
+    r = ratio(vs_ensemble, model, ENSEMBLE)
+    vs_ens = f"{round(abs(1 - r) * 100)}% {'less' if r < 1 else 'more'} error than the hub ensemble"
+    beaten = sum(t["ratio"] < 1 for t in ranked)
+    headline = f"Better than {beaten} of {len(ranked)} teams; {vs_ens}" if ranked else f"Only outside team so far; {vs_ens}"
+    rounds = vs_ensemble.index.get_level_values("origin_date").nunique()
     period = f"2026-27 season, {rounds} round{'s' if rounds != 1 else ''} scored, interim; updated {today}"
     return {"headline": headline, "period": period, "rows": rows}
 
