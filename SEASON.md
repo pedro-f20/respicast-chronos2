@@ -4,29 +4,30 @@ Interim, from the hub's WIS scores (`model-evaluation/latest-forecast_scores.csv
 
 | comparator | ratio | shared cells | rounds | ranked |
 |---|---|---|---|---|
-| respicast-hubEnsemble | 1.04 | 105 | 2 |  |
-| respicast-quantileBaseline | 0.80 | 105 | 2 |  |
-| DHauser-FluChronos | 1.05 | 105 | 2 | yes |
-| ECDC-SARIMA | 0.75 | 95 | 2 | yes |
-| ECDC-soca_simplex | 0.87 | 102 | 2 | yes |
-| ISI-LightGBM | 0.94 | 105 | 2 | yes |
-| ISI-RespiVAR | 1.08 | 105 | 2 | yes |
-| ISI-Respiro | 1.08 | 87 | 2 | yes |
-| IceLab-EDM | 1.03 | 105 | 2 | yes |
-| ItaLuxColab-EpiEKF | 0.58 | 54 | 2 | yes |
-| ItaLuxColab-EpiNetEKF | 0.71 | 52 | 2 | no |
-| NDP-v1 | 0.86 | 23 | 1 | no |
-| QMUL-ARIMA | 0.52 | 43 | 2 | no |
-| QMUL-SEIR | 0.47 | 37 | 2 | no |
-| QMUL-SEIR_agumented | 0.49 | 32 | 2 | no |
-| RIVM-KFdlm | 0.57 | 54 | 2 | yes |
-| fluxengine-chronos2 | 0.80 | 3 | 2 | no |
-| fluxengine-triad | 0.89 | 3 | 2 | no |
-| safinea-PRFM | 0.67 | 103 | 2 | yes |
+| respicast-hubEnsemble | 0.99 | 220 | 3 |  |
+| respicast-quantileBaseline | 0.74 | 220 | 3 |  |
+| DHauser-FluChronos | 1.02 | 220 | 3 | yes |
+| ECDC-SARIMA | 0.70 | 201 | 3 | yes |
+| ECDC-soca_simplex | 0.77 | 215 | 3 | yes |
+| ISI-LightGBM | 0.88 | 220 | 3 | yes |
+| ISI-RespiVAR | 0.97 | 218 | 3 | yes |
+| ISI-Respiro | 0.99 | 188 | 3 | yes |
+| IceLab-EDM | 1.01 | 220 | 3 | yes |
+| ItaLuxColab-EpiEKF | 0.58 | 116 | 3 | yes |
+| ItaLuxColab-EpiNetEKF | 0.73 | 114 | 3 | yes |
+| NDP-v1 | 0.82 | 52 | 1 | no |
+| QMUL-ARIMA | 0.60 | 94 | 3 | no |
+| QMUL-SEIR | 0.56 | 81 | 3 | no |
+| QMUL-SEIR_agumented | 0.42 | 70 | 3 | no |
+| RIVM-KFdlm | 0.60 | 115 | 3 | yes |
+| fluxengine-chronos2 | 0.99 | 5 | 2 | no |
+| fluxengine-triad | 0.95 | 6 | 3 | no |
+| safinea-PRFM | 0.70 | 217 | 3 | yes |
 
 By round, vs respicast-hubEnsemble:
 
 | round | ratio | cells |
 |---|---|---|
-| 2026-10-28 | 1.05 | 71 |
-| 2026-11-04 | 0.96 | 34 |
+| 2026-10-28 | 1.00 | 110 |
+| 2026-11-04 | 0.93 | 73 |
+| 2026-11-11 | 0.94 | 37 |

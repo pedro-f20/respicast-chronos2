@@ -1,36 +1,36 @@
 {
-  "headline": "Better than 6 of 10 teams; 4% more error than the hub ensemble",
-  "period": "2026-27 season, 2 rounds scored, interim; updated 2026-11-15",
+  "headline": "Better than 9 of 11 teams; 1% less error than the hub ensemble",
+  "period": "2026-27 season, 3 rounds scored, interim; updated 2026-11-19",
   "rows": [
     {
       "measure": "Us vs hub ensemble",
-      "value": "1.04",
-      "range": "105 cells"
+      "value": "0.99",
+      "range": "220 cells"
     },
     {
       "measure": "Us vs baseline",
-      "value": "0.80",
-      "range": "105 cells"
-    },
-    {
-      "measure": "Us vs ISI-Respiro",
-      "value": "1.08",
-      "range": "87 cells"
-    },
-    {
-      "measure": "Us vs ISI-RespiVAR",
-      "value": "1.08",
-      "range": "105 cells"
+      "value": "0.74",
+      "range": "220 cells"
     },
     {
       "measure": "Us vs DHauser-FluChronos",
-      "value": "1.05",
-      "range": "105 cells"
+      "value": "1.02",
+      "range": "220 cells"
     },
     {
       "measure": "Us vs IceLab-EDM",
-      "value": "1.03",
-      "range": "105 cells"
+      "value": "1.01",
+      "range": "220 cells"
+    },
+    {
+      "measure": "Us vs ISI-Respiro",
+      "value": "0.99",
+      "range": "188 cells"
+    },
+    {
+      "measure": "Us vs ISI-RespiVAR",
+      "value": "0.97",
+      "range": "218 cells"
     }
   ]
 }
